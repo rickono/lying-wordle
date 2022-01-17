@@ -28,11 +28,14 @@
   color: #61dafb;
 }
 
-@keyframes App-logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+.letter {
+  width: 3rem;
+  height: 3rem;
+}
+
+.game-row {
+  display: flex;
+  margin-top: 1rem;
+  width: 20rem;
+  justify-content: space-between;
 }
