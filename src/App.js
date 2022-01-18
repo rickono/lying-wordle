@@ -8,95 +8,66 @@ import 'react-simple-keyboard/build/css/index.css';
 // https://github.com/words/an-array-of-english-words
 
 import { Aa, La } from './words.js';
-
-const Letter = ({ letter, color }) => {
-  return (
-    <div className='letter' style={{ backgroundColor: `${color}` }}>
-      {letter}
-    </div>
-  );
-};
-
-const GameRow = ({ guess, realWord, guessLies, lieRate }) => {
-  return (
-    <div className='game-row'>
-      {Array.prototype.map.call(guess, (letter, idx) => {
-        // 0: green, 1: yellow, 2: grey
-        // 0: If lies[] is < 0.1, lie.
-        // 1: If lies[] is < 0.05, green->yellow, yellow->grey, grey->green
-        // 2: If lies[] is > 0.05, < 0.1, green<-yellow, yellow<-grey, grey<-green
-        const colors = ['#5ae880', '#f7d95e', '#6f6f6f'];
-        const lieType =
-          guessLies[idx] >= lieRate / 100
-            ? 0
-            : guessLies[idx] < lieRate / 200
-            ? 1
-            : -1;
-        const realColor =
-          realWord[idx] === letter ? 0 : realWord.includes(letter) ? 1 : 2;
-
-        const color =
-          guess === realWord
-            ? '#5ae880'
-            : realWord[idx] === letter
-            ? colors[(realColor + lieType) % 3]
-            : realWord.includes(letter)
-            ? colors[(realColor + lieType) % 3]
-            : colors[(realColor + lieType) % 3];
-        return (
-          <Letter
-            letter={letter.toUpperCase()}
-            color={color || '#6f6f6f'}
-            key={guess + letter + idx}
-          />
-        );
-      })}
-    </div>
-  );
-};
+import Board from './components/Board';
 
 function App() {
-  const [currentWord, setCurrentWord] = useState(null);
-  const [guesses, setGuesses] = useState([]);
   const [currentGuess, setCurrentGuess] = useState('');
-  const [lies, setLies] = useState([]);
-  const [finished, setFinished] = useState(false);
-  const [letters, setLetters] = useState(new Set());
-  const [lieRate, setLieRate] = useState(10);
-  const [started, setStarted] = useState(false);
+  const [game, setGame] = useState({
+    currentWord: null,
+    guesses: [],
+    lies: [],
+    state: 1, // 0: not started, 1: in game, 2: finished+lost, 3: finished+won
+    letters: new Set(),
+    lieRate: 10,
+  });
 
   useEffect(() => {
-    setCurrentWord(Aa[Math.floor(Math.random() * Aa.length)]);
+    setGame({
+      ...game,
+      currentWord: Aa[Math.floor(Math.random() * Aa.length)],
+    });
   }, []);
 
   const guessWord = (e) => {
     if (e) {
       e.preventDefault();
     }
+    // If the length of the word is 5, it is included in the allowed words, and word has not been used
     if (
       currentGuess.length === 5 &&
       (La.includes(currentGuess) || Aa.includes(currentGuess)) &&
-      !guesses.includes(currentGuess)
+      !game.guesses.includes(currentGuess)
     ) {
-      setGuesses([...guesses, currentGuess]);
-      setLies([
-        ...lies,
-        Array.prototype.map.call(currentGuess, (letter) => {
-          return Math.random();
-        }),
-      ]);
-      const guessedLetters = new Set(
-        [...guesses, currentGuess]
-          .map((word) => {
-            return Array.prototype.map.call(word, (letter) => {
-              return letter;
-            });
-          })
-          .flat()
-      );
-      setLetters(guessedLetters);
-      setStarted(currentGuess !== currentWord);
-      setFinished(currentGuess === currentWord);
+      // Update game: add guess to guesses, generate lies, add letters to used, update state
+      setGame({
+        ...game,
+        guesses: [...game.guesses, currentGuess],
+        lies: [
+          ...game.lies,
+          Array.prototype.map.call(currentGuess, (letter) => {
+            return Math.random();
+          }),
+        ],
+        letters: new Set(
+          [...game.guesses, currentGuess]
+            .map((word) => {
+              return Array.prototype.map.call(word, (letter) => {
+                return letter;
+              });
+            })
+            .flat()
+        ),
+        state: (() => {
+          // In game
+          if (currentGuess !== game.currentWord) {
+            return 1;
+          }
+          // Game won
+          else if (currentGuess === game.currentWord) {
+            return 3;
+          }
+        })(),
+      });
     }
     setCurrentGuess('');
   };
@@ -104,35 +75,23 @@ function App() {
   return (
     <div className='App'>
       <div className='App-header'>
-        <label htmlFor=''>Lying Rate: {lieRate}%</label>
+        <label htmlFor=''>Lying Rate: {game.lieRate}%</label>
         <input
           type='range'
           min='0'
           max='100'
-          value={lieRate}
+          step={10}
+          value={game.lieRate}
           class='slider'
-          onChange={(e) => setLieRate(e.target.value)}
-          disabled={started}
+          onChange={(e) => setGame({ ...game, lieRate: e.target.value })}
+          disabled={game.guesses.length !== 0}
         />
         <h3>Lying Wordle</h3>
         <p>Like Wordle, but if Kevin gave the hints.</p>
 
-        {currentWord && (
-          <div className='board'>
-            {guesses.map((guess, idx) => {
-              return (
-                <GameRow
-                  guess={guess}
-                  realWord={currentWord}
-                  guessLies={lies[idx]}
-                  key={guess + idx}
-                  lieRate={lieRate}
-                />
-              );
-            })}
-          </div>
-        )}
-        {!finished && (
+        {game.guesses.length > 0 && <p>Guesses: {game.guesses.length}</p>}
+        {game.currentWord && <Board game={game} />}
+        {game.state === 1 && (
           <form onSubmit={guessWord}>
             <input
               type='text'
@@ -146,23 +105,28 @@ function App() {
           </form>
         )}
         <div className='buttons'>
-          <button className='giveup' onClick={(e) => setFinished(true)}>
+          <button
+            className='giveup'
+            onClick={(e) => setGame({ ...game, state: 2 })}
+          >
             Give Up
           </button>
           <button
             onClick={(e) => {
-              setFinished(false);
-              setCurrentWord(Aa[Math.floor(Math.random() * Aa.length)]);
-              setLies([]);
-              setGuesses([]);
-              setLetters(new Set());
-              setStarted(true);
+              setGame({
+                ...game,
+                state: 1,
+                currentWord: Aa[Math.floor(Math.random() * Aa.length)],
+                lies: [],
+                guesses: [],
+                letters: new Set(),
+              });
             }}
           >
             New Game
           </button>
         </div>
-        {finished && `The word was ${currentWord}`}
+        {[2, 3].includes(game.state) && `The word was ${game.currentWord}`}
         <Keyboard
           layout={{
             default: [
@@ -175,7 +139,7 @@ function App() {
           buttonTheme={[
             {
               class: 'hg-red',
-              buttons: Array(...letters).join(' '),
+              buttons: Array(...game.letters).join(' '),
             },
           ]}
           display={{
@@ -188,7 +152,7 @@ function App() {
                 currentGuess.substring(0, currentGuess.length - 1)
               );
             } else {
-              setCurrentGuess(currentGuess + button);
+              setCurrentGuess(game.currentGuess + button);
             }
           }}
         />
