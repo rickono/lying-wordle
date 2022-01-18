@@ -2316,6 +2316,11 @@ export const Aa = [
   'shave',
 ];
 export const La = [
+  'ricko',
+  'trini',
+  'anika',
+  'kevin',
+  'sarah',
   'aahed',
   'aalii',
   'aargh',
